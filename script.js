@@ -1,83 +1,133 @@
 const main = (function() {
-    let currentValue = '';
-    let operators = [];
+    // properties
+    const availableOperators = ['+', '-', '*', '/'];
     const selectors = {
         calcSymbolsArray: document.querySelectorAll('.calc__row-item:not(.calc__row-item-clear):not(.calc__row-item-evaluate)'),
-        calcVisibleValue: document.querySelector('.calc__result-value'),
-        calcOperators: document.querySelectorAll('.calc__row-item-operator'),
-        calcDigits: document.querySelectorAll('.calc__row-item--digit'), 
-        calcEvaluate: document.querySelector('.calc__row-item-evaluate')
+        calcResult: document.querySelector('.calc__result-value'),
+        calcEvaluate: document.querySelector('.calc__row-item-evaluate'),
+        calcClear: document.querySelector('.calc__row-item-clear')
     };
+    let userInputValue = '';
+    let usedOperators = [];
+    let onlyDigits = [];
+    // methods
     function showOperation() {
         selectors.calcSymbolsArray.forEach(item => {
             item.addEventListener('click', (e) => {
-                currentValue += e.target.innerHTML;
-                selectors.calcVisibleValue.innerHTML = currentValue;
+                const userInputValueLength = userInputValue.length;
+                /* 
+                  add an operator to usedOperators array, if that's actually an operator and the previous 
+                  item in userInput entry is a number, in order to not add needless operators into array,
+                  since we need only one between two numbers.
+                */
+                if (availableOperators.includes(e.target.innerHTML) && !availableOperators.includes(userInputValue[userInputValueLength - 1])) {
+                    usedOperators.push(e.target.innerHTML);
+                }
+                /*
+                  make sure only minus operator can be before first number, because +/* as a first index in the expression
+                  (+100+50*2/4...) doesn't make any sense. If user tries to use them, simply return.
+                */
+                if (userInputValueLength === 0 && availableOperators.includes(e.target.innerHTML)) {
+                    if (e.target.innerHTML === '-') {
+                        userInputValue += e.target.innerHTML;
+                        selectors.calcResult.innerHTML = userInputValue;
+                    }
+                    return;
+                }
+                /*
+                  show user's input, if it's an operator, but the previous one was not
+                  (to not repeat two operators in same place), or if it's just a number.
+                */
+                if (!availableOperators.includes(userInputValue[userInputValueLength - 1]) || !availableOperators.includes(e.target.innerHTML)) {
+                    userInputValue += e.target.innerHTML;
+                    selectors.calcResult.innerHTML = userInputValue;
+                }
             })
         })
     }
     function evaluate() {
         selectors.calcEvaluate.addEventListener('click', (e) => {
-            // calculatePriorOperators();
-            const onlyDigits = getOnlyDigits();
+            getOnlyDigits();
             let result = onlyDigits[0];
-            operators.forEach((item, index) => {
-                if (onlyDigits[index + 1] !== undefined) {
+            /* 
+              Convert number to negative, if the first symbol is minus. Also remove this minus from the 
+              array of operators in order to not use it in the iteration, because it's related only to the first element,
+              but isn't an operand between two digits.
+            */
+            if (userInputValue[0] === '-') {
+                userInputValue = userInputValue.substring(1);
+                result = -Math.abs(result);
+                usedOperators.shift();
+            }
+            usedOperators.forEach((item, index) => {
+                const nextItem = onlyDigits[index + 1];
+                if (nextItem !== undefined) {
                     switch(item) {
+                        /*
+                          special checks for '+' and '-' operators. Since they have less priority, comparing to
+                          multivision and division, we want to be sure that the next operator is neither '*' nor '/'.
+                          If they are, we need firstly to calculate those operations and only then perform addition or
+                          subtraktion. The logic for this is implemented in calculatePriorNumber() function.
+                        */
                         case "+": 
-                            if (operators[index + 1] !== "*" && operators[index + 1] !== "/") {
-                                result += onlyDigits[index + 1];
-                            } else if(operators[index + 1] === "*") {
-                                result += (onlyDigits[index + 1] * onlyDigits[index + 2]);
-                                onlyDigits.splice(index + 1, 2, result);
-                                operators.splice(index + 1, 1);
-                            } else if(operators[index + 1] === "/") {
-                                result += (onlyDigits[index + 1] / onlyDigits[index + 2]);
-                                onlyDigits.splice(index + 1, 2, result);
-                                operators.splice(index + 1, 1);
+                            if (usedOperators[index + 1] !== "*" && usedOperators[index + 1] !== "/") {
+                                result += nextItem;
+                            } else {
+                                calculatePriorNumber(index + 1);
+                                result += nextItem;
                             }
                             break;
                         case "-":
-                            result -= onlyDigits[index + 1]; 
+                            if (usedOperators[index + 1] !== "*" && usedOperators[index + 1] !== "/") {
+                                result -= nextItem;
+                            } else {
+                                calculatePriorNumber(index + 1);
+                                result -= nextItem;
+                            }
                             break;
                         case "*":
-                            result *= onlyDigits[index + 1]; 
+                            result *= nextItem;
                             break;
                         case "/":
-                            result /= onlyDigits[index + 1]; 
+                            result /= nextItem;
                             break;
                         default:
-                            console.log('not correct operator');
+                            result = 'error';
                             break;
                     }
                 }
-                console.log(result);
             });
-            // selectors.calcVisibleValue.innerHTML = result;
+            // saving calculated result
+            selectors.calcResult.innerHTML = result;
+            onlyDigits = [result];
+            usedOperators = [];
+            userInputValue = result;
         });
     };
     function clear() {
-        document.querySelector('.calc__row-item-clear').addEventListener('click', () => {
-            currentValue = [];
-            operators = [];
-            selectors.calcVisibleValue.innerHTML = 0;
+        selectors.calcClear.addEventListener('click', () => {
+            userInputValue = [];
+            usedOperators = [];
+            selectors.calcResult.innerHTML = 0;
         });
     };
-    function operate() {
-        selectors.calcOperators.forEach(item => {
-            item.addEventListener('click', (e) => {
-                operators.push(e.target.innerHTML);
-            });
-        });
+    function calculatePriorNumber(i) {
+        while (usedOperators[i] === "*" || usedOperators[i] === "/") {
+            if (usedOperators[i] === "*") {
+                onlyDigits.splice(i, 2, onlyDigits[i] * onlyDigits[i + 1]);
+            } else if (usedOperators[i] === "/") {
+                onlyDigits.splice(i, 2, onlyDigits[i] / onlyDigits[i + 1]);
+            }
+            usedOperators.splice(i, 1);
+        }
     };
     function getOnlyDigits() {
-        // hardcode with filter!!!
-        return currentValue.split(/[*+-/]/).filter(item => item !== "").map(item => Number(item));
+        // hardcoded with filter!!!
+        onlyDigits = userInputValue.split(/[*+-/]/).filter(item => item !== "").map(item => Number(item));
     }
     function init() {
         showOperation();
         evaluate();
-        operate();
         clear();
     }
     return { init }
