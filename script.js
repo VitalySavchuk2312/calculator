@@ -33,6 +33,10 @@ const calculator = (function() {
                     }
                     return;
                 }
+                // prevent using multiple zeros from the fist index of user input
+                if (userInputValueLength === 0 && e.target.innerHTML === '0') {
+                    return;
+                }
                 setUserInput(e.target.innerHTML);
             })
         })
@@ -41,61 +45,65 @@ const calculator = (function() {
         userInputValue += value;
         selectors.calcResultValue.innerHTML = userInputValue;
     }
-    function evaluate() {
+    function calculate() {
         selectors.calcEvaluate.addEventListener('click', (e) => {
             getOnlyDigits();
-            let result = onlyDigits[0];
-            // Converting number to negative, if the first symbol is a minus. Also removing this minus from
-            // user's input string, since the result can become a positive after calculation.
-            if (userInputValue[0] === '-') {
-                userInputValue = userInputValue.substring(1);
-                result = -Math.abs(result);
-            }
-            usedOperators.forEach((item, index) => {
-                const nextOperator = usedOperators[index + 1];
-                if (onlyDigits[index + 1] !== undefined) {
-                    switch(item) {
-                        /*
-                          Special checks for '+' and '-' operators. Since they have less priority, comparing to
-                          multiplication and division, we want to be sure that the next operators are 
-                          not '*' or '/' before calculation. But if they are, we need firstly to calculate those 
-                          operations and only then perform addition or subtraktion. The logic for this is implemented in 
-                          calculatePriorNumber function.
-                        */
-                        case "+": 
-                            if (nextOperator !== "*" && nextOperator !== "/") {
-                                result += onlyDigits[index + 1];
-                            } else {
-                                calculatePriorNumber(index + 1);
-                                result += onlyDigits[index + 1];
-                            }
-                            break;
-                        case "-":
-                            if (nextOperator !== "*" && nextOperator !== "/") {
-                                result -= onlyDigits[index + 1];
-                            } else {
-                                calculatePriorNumber(index + 1);
-                                result -= onlyDigits[index + 1];
-                            }
-                            break;
-                        case "*":
-                            result *= onlyDigits[index + 1];
-                            break;
-                        case "/":
-                            result /= onlyDigits[index + 1];
-                            break;
-                        default:
-                            result = 'error';
-                            break;
-                    }
+            // check to prevent function invocation when user tries to calculate expression without putting any digits
+            if (onlyDigits.length > 1) {
+                let result = onlyDigits[0];
+                // Converting number to negative, if the first symbol is a minus. Also removing this minus from
+                // user's input string, since the result can become a positive after calculation.
+                if (userInputValue[0] === '-') {
+                    userInputValue = userInputValue.substring(1);
+                    result = -Math.abs(result);
                 }
-            });
-            // saving calculated result
-            selectors.calcResultValue.innerHTML = result;
-            onlyDigits = [result];
-            usedOperators = [];
-            userInputValue = result;
+                usedOperators.forEach((item, index) => {
+                    const nextOperator = usedOperators[index + 1];
+                    if (onlyDigits[index + 1] !== undefined) {
+                        switch(item) {
+                            /*
+                                Special checks for '+' and '-' operators. Since they have less priority, comparing to
+                                multiplication and division, we want to be sure that the next operators are 
+                                not '*' or '/' before calculation. But if they are, we need firstly to calculate those 
+                                operations and only then perform addition or subtraktion. The logic for this is implemented in 
+                                calculatePriorNumber function.
+                            */
+                            case "+": 
+                                if (nextOperator !== "*" && nextOperator !== "/") {
+                                    result += onlyDigits[index + 1];
+                                } else {
+                                    calculatePriorNumber(index + 1);
+                                    result += onlyDigits[index + 1];
+                                }
+                                break;
+                            case "-":
+                                if (nextOperator !== "*" && nextOperator !== "/") {
+                                    result -= onlyDigits[index + 1];
+                                } else {
+                                    calculatePriorNumber(index + 1);
+                                    result -= onlyDigits[index + 1];
+                                }
+                                break;
+                            case "*":
+                                result *= onlyDigits[index + 1];
+                                break;
+                            case "/":
+                                result /= onlyDigits[index + 1];
+                                break;
+                            default:
+                                result = 'error';
+                                break;
+                        }
+                    }
+                });
+                // saving calculated result
+                selectors.calcResultValue.innerHTML = result;
+                onlyDigits = [result];
+                usedOperators = [];
+                userInputValue = result;
+            }
         });
+        return;
     };
     function clear() {
         selectors.calcClear.addEventListener('click', () => {
@@ -117,11 +125,14 @@ const calculator = (function() {
         }
     };
     function getOnlyDigits() {
-        onlyDigits = userInputValue.split(/[*+-/]/).filter(item => item !== "").map(item => parseInt(item));
+        if (userInputValue.length) {
+            onlyDigits = userInputValue.split(/[*+-/]/).filter(item => item !== "").map(item => parseInt(item));
+        }
+        return;
     }
     function init() {
         showOperation();
-        evaluate();
+        calculate();
         clear();
     }
     return { init }
